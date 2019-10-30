@@ -20,7 +20,13 @@ import lightgbm as lgb
 
 
 # GLOBAL PART
-file=os.path.join(r'd:/BTP/LocalDataBase','normalization20190712.h5')
+# database='MaoTickFactors20190831'
+# INFLUXDBHOST='192.168.58.71'
+# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+database='MaoTickFactors20191027'
+INFLUXDBHOST='192.168.38.2'
+file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
@@ -29,9 +35,7 @@ TARGET_COLUMNS = ['midIncreaseNext1m']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 #startDate=20180401
 #endDate=20190628
-database='MaoTickFactors20190831'
-INFLUXDBHOST='192.168.58.71'
-LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+
 model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
 BATCH_SIZE = 200
 SEQ_LENGTH = 10
