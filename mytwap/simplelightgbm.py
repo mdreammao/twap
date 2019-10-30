@@ -309,14 +309,15 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
            # 'boosting_type': 'dart',  # 设置提升类型
             #'drop_rate' : 0.8,
             'learning_rate': 0.01,  # 学习速率
-            'num_leaves': 1000,  # 叶子节点数
+            'num_leaves': 2000,  # 叶子节点数
             'tree_learner': 'serial',
             'min_data_in_leaf': 10,
             'metric': ['l1', 'l2', 'rmse'],  # l1:mae, l2:mse  # 评估函数
             'max_bin': 255,
-            'num_trees':500,
-            'max_depth':50,
+            'num_trees':300,
+            'max_depth':30,
             'num_threads':8,
+            'is_unbalance':'true'
             #'verbose':1
 
     }
@@ -341,7 +342,7 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
                         init_model=gbm,  # 如果gbm不为None，那么就是在上次的基础上接着训练
                         # feature_name=x_cols,
                         early_stopping_rounds=100,
-                        verbose_eval=True,
+                        verbose_eval=False,
                         keep_training_booster=True)
         # 输出模型评估分数
         score_train = dict([(s[1], s[2]) for s in gbm.eval_train()])
@@ -357,9 +358,9 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
         break
     return gbm
 days=getTradedays(20180101,20191025)
-trainNum=20
+trainNum=100
 stocks=getCodes(500)
-
+stocks=['600000.SH']
 
 for i in range(trainNum,len(days)-1,1):
     trainStart=days[i-trainNum]
@@ -375,7 +376,9 @@ for i in range(trainNum,len(days)-1,1):
     predict = mygbm.predict(testInputs)
     r2 = np.round(r2_score(testTargets, predict),4)
     corr=np.round(np.corrcoef(testTargets,predict)[0][1],4)
+    print(f'today: {today} code: {stocks} ')
     print('当前模型在训练集的R2是：R2=%.4f  corr是：corr=%.4f' % (r2,corr))
+    print("==============================================================")
 pass
 
 #for i in range(trainNum,len(days)-1,1):
