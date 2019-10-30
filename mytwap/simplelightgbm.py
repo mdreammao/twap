@@ -20,15 +20,15 @@ from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
 # GLOBAL PART
-LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-database='MaoTickFactors20190831'
-INFLUXDBHOST='192.168.58.71'
-os.environ['NUMEXPR_MAX_THREADS'] = '12'
-LOCALFeatureDATAPATH=r'd:/Data'
-#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-#database='MaoTickFactors20191027'
-#INFLUXDBHOST='192.168.38.2'
-#os.environ['NUMEXPR_MAX_THREADS'] = '30'
+# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+# database='MaoTickFactors20190831'
+# INFLUXDBHOST='192.168.58.71'
+# os.environ['NUMEXPR_MAX_THREADS'] = '12'
+# LOCALFeatureDATAPATH=r'd:/Data'
+LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+database='MaoTickFactors20191027'
+INFLUXDBHOST='192.168.38.2'
+os.environ['NUMEXPR_MAX_THREADS'] = '30'
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
@@ -39,13 +39,13 @@ USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 
 
 
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 SEQ_LENGTH = 10
-VALIDATION_SIZE = 5
+VALIDATION_SIZE = 200
 INLOOP_SIZE = 10000
 PREPARE_JOBS = -1
-startDate=20180901
-endDate=20180915
+startDate=20190101
+endDate=20191025
 model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
 All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS
 
@@ -183,6 +183,7 @@ def get_tick_data(code,date,database,columns=All_COLUMNS):
         y = 100*tick_data[TARGET_COLUMNS].values
         #y=np.clip(y,a_min=-1,a_max=1)/6
         flag = tick_data['realData'].values
+        del tick_data
         return np.concatenate((padding, X), axis=0), y, flag
     except:
         #print(f'data of {code} in {date} from {database} has error!!!')
@@ -316,7 +317,7 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
             'max_bin': 255,
             'num_trees':500,
             'max_depth':50,
-            'num_threads':8,
+            'num_threads':18,
             #'verbose':1
 
     }
@@ -356,8 +357,8 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
         current_loop+=1
         break
     return gbm
-days=getTradedays(20180101,20191025)
-trainNum=20
+days=getTradedays(20190101,20191025)
+trainNum=60
 stocks=getCodes(500)
 
 
@@ -368,7 +369,7 @@ for i in range(trainNum,len(days)-1,1):
     mygbm=mytrain2(stocks,trainStart,trainEnd,today,BATCH_SIZE)
     test_list = getDataList(stocks, today, today)
     load_index_list = np.random.permutation(len(test_list))
-    batch_idx = load_index_list[0:min(BATCH_SIZE,len(test_list))]
+    batch_idx = load_index_list[0:min(VALIDATION_SIZE,len(test_list))]
     prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database,All_COLUMNS) for o in [test_list[z] for z in batch_idx])
     #prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_fromh5)(o['code'], o['date'], All_COLUMNS) for o in [test_list[z] for z in batch_idx])
     testInputs, testTargets = getDataAssumble(prepared_data)
