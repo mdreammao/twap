@@ -41,8 +41,8 @@ SEQ_LENGTH = 10
 VALIDATION_SIZE = 5
 INLOOP_SIZE = 10000
 PREPARE_JOBS = 12   
-startDate=20180101
-endDate=20181231
+startDate=20180903
+endDate=20180915
 testStart=20190103
 testEnd=20190103
 model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
@@ -116,11 +116,21 @@ def dataNormalization(dataAll,normalization):
     return dataAll
     pass
 
-
-def get_tick_data(code,date,database,columns=All_COLUMNS):
+def getDataFromH5(code,date,columns):
+    code=str(code)
+    date=str(date)
+    #code=code.replace('.','_')
+    file=os.path.join(LOCALFeatureDATAPATH,'features',date,code+".h5")
+    if (os.path.isfile(file)==True):
+        with pd.HDFStore(file,'r',complib='blosc:zstd',append=False,complevel=9) as store:
+            data=store['data']
+        return data[columns]
+    else:
+        return pd.DataFrame()
+def get_tick_data_FromH5(code,date,columns=All_COLUMNS):
     try:
 
-        tick_data = getDataFromInfluxdb(code,date,database,columns)
+        tick_data = getDataFromH5(code,date,columns)
         if tick_data.shape[0]==0:
             #print(f'data of {code} in {date} from {database} has error!!!')
             return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
@@ -143,6 +153,32 @@ def get_tick_data(code,date,database,columns=All_COLUMNS):
     except:
         #print(f'data of {code} in {date} from {database} has error!!!')
         return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
+#def get_tick_data(code,date,database,columns=All_COLUMNS):
+#    try:
+
+#        tick_data = getDataFromInfluxdb(code,date,database,columns)
+#        if tick_data.shape[0]==0:
+#            #print(f'data of {code} in {date} from {database} has error!!!')
+#            return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
+#        ##标准化
+#        tick_data=dataNormalization(tick_data,mynormalization)
+#        # replace inf to na
+#        tick_data = tick_data.replace(np.inf, np.nan)
+#        tick_data = tick_data.replace(-np.inf, np.nan)
+#        ##去掉开头和结尾的nan
+#        startIndex=tick_data[tick_data.isna().sum(axis=1)==0].index[0]
+#        endIndex=tick_data[tick_data.isna().sum(axis=1)==0].index[-1]
+#        tick_data=tick_data.loc[startIndex:endIndex,:]
+#        ## split X, y 
+#        X = tick_data[FEATURE_COLUMNS].values
+#        padding = np.zeros((SEQ_LENGTH-1, X.shape[1]))
+#        y = 100*tick_data[TARGET_COLUMNS].values
+#        y=np.clip(y,a_min=-1,a_max=1)/6
+#        flag = tick_data['realData'].values
+#        return np.concatenate((padding, X), axis=0), y, flag
+#    except:
+#        #print(f'data of {code} in {date} from {database} has error!!!')
+#        return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
 
 
 
@@ -221,9 +257,9 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
         #inputs,testInputs,targets, testTargets = train_test_split(inputsAll, targetsAll, test_size=0.2)
         train_list_now = train_list[batch_start:batch_middle ]
         test_list_now=train_list[batch_middle+1: batch_end]
-        prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in train_list_now)
+        prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_FromH5)(o['code'], o['date'], database, All_COLUMNS) for o in train_list_now)
         inputs,targets=getDataAssumble(prepared_data)
-        prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in test_list_now)
+        prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_FromH5)(o['code'], o['date'], database, All_COLUMNS) for o in test_list_now)
         testInputs,testTargets=getDataAssumble(prepared_data)
         batch_start=batch_start+BATCH_SIZE
         if (len(inputs)==0) | (len(testInputs)==0):
@@ -255,12 +291,10 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
 
 
 days=getTradedays(startDate,endDate)
-trainNum=20
+trainNum=5
 stocks=getCodes()
 train_list=getDataList(stocks,startDate,endDate)
 test_list=getDataList(stocks,testStart,testEnd)
-BATCH_SIZE1=(int)(round(0.7*BATCH_SIZE,0))
-BATCH_SIZE2=(int)(round(0.3*BATCH_SIZE,0))
 
 for i in range(trainNum,len(days)-1,1):
     start0=days[i-trainNum]

@@ -185,17 +185,20 @@ def saveDataFromInfluxdb(code,date,database,columns):
     else:
         print(f'data of {code} in {date} has already exits!')
 def getDataFromH5(code,date,columns):
+    code=str(code)
+    date=str(date)
     #code=code.replace('.','_')
     file=os.path.join(LOCALFeatureDATAPATH,'features',date,code+".h5")
-    if (os.path.isfile(file)==False):
+    if (os.path.isfile(file)==True):
         with pd.HDFStore(file,'r',complib='blosc:zstd',append=False,complevel=9) as store:
             data=store['data']
         return data[columns]
     else:
         return pd.DataFrame()
 stocks=getCodes()
-dataList=getDataList(stocks,20180901,20181231)
-Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
-        
+dataList=getDataList(stocks,20180901,20180915)
+#Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
+data=getDataFromH5('600000.SH',20180903,All_COLUMNS)  
+print('ok!')
 #gbm = lgb.Booster(model_file=model_save_path)
 
