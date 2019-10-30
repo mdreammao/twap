@@ -9,7 +9,6 @@ import dateutil.parser as dtparser
 import datetime
 import torch
 import os
-
 import warnings
 warnings.filterwarnings("ignore") 
 import time
@@ -18,12 +17,12 @@ import sklearn
 from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
-
 # GLOBAL PART
 # database='MaoTickFactors20190831'
 # INFLUXDBHOST='192.168.58.71'
 # LOCALDATAPATH=r'd:/BTP/LocalDataBase'
 LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+LOCALFeatureDATAPATH=r'/home/maoheng/Data'
 database='MaoTickFactors20191027'
 INFLUXDBHOST='192.168.38.2'
 os.environ['NUMEXPR_MAX_THREADS'] = '4'
@@ -31,11 +30,9 @@ file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
-#TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
-TARGET_COLUMNS = ['midIncreaseNext1m']
+TARGET_COLUMNS = ['midIncreaseNext1m','buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
-#startDate=20180401
-#endDate=20190628
+All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS+['B1','S1']
 
 model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
 BATCH_SIZE = 200
@@ -43,10 +40,10 @@ SEQ_LENGTH = 10
 VALIDATION_SIZE = 5
 INLOOP_SIZE = 10000
 PREPARE_JOBS = 8   
-startDate=20170101
-endDate=20171231
-testStart=20180101
-testEnd=20180131
+startDate=20180901
+endDate=20191025
+
+
 
 def getCodes():
     localFileStr=os.path.join(LOCALDATAPATH,'stockCode.h5')
@@ -116,7 +113,7 @@ def dataNormalization(dataAll,normalization):
     return dataAll
     pass
 
-All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS
+
 def get_tick_data(code,date,database,columns=All_COLUMNS):
     try:
         tick_data = getDataFromInfluxdb(code,date,database,columns)
@@ -143,10 +140,6 @@ def get_tick_data(code,date,database,columns=All_COLUMNS):
     except:
         #print(f'data of {code} in {date} from {database} has error!!!')
         return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1)),[]
-
-
-
-
 def modifyData(batch_X, batch_y, batch_flag):
     timeSeries=batch_X.shape[0]
     factors=batch_X.shape[1]
@@ -166,72 +159,28 @@ def modifyData(batch_X, batch_y, batch_flag):
     batch_seq_y[np.isnan(batch_seq_y)]=0
     return batch_seq_X,batch_seq_y.flatten(),na_idx
 
-gbm = lgb.Booster(model_file=model_save_path)
-
-def statistics(code,date,model):
-    batch_X, batch_y, batch_flag,mytime=get_tick_data(code,date,database, All_COLUMNS)
-    if (batch_X.shape[0]<1000):
-        return 
-    
-    input,target,flag=  modifyData( batch_X, batch_y, batch_flag) 
-    predict=gbm.predict(input)
-    predictDf=pd.DataFrame(index=mytime)
-    predictDf['predict']=predict
-    predictDf['target']=target
-    predictDf['flag']=flag
-    tickData=getDataFromInfluxdb(code,date,database,['B1','S1'])
-    #if tickData['B1'].mean()<10:
-    #    return
-    tickData[['predict','target','flag']]=predictDf[['predict','target','flag']]
-    tick=tickData.values
-    buy=0
-    sell=0
-    mybuy=0
-    mysell=0
-    num=0
-    step=20
-    for i in range(0,tick.shape[0]-1,step):
-        buy+=tick[i][1]
-        sell+=tick[i][0]
-        num=num+1
-        #如果要跌，等等再买
-        if (tick[i][2]<-0.02) & (tick[i][3]<1) & (i<(tick.shape[0]-2*step)):
-            mybuy+=tick[i+step][1]
-        else:
-            mybuy+=tick[i][1]
-        #如果要涨，等等再卖
-        if (tick[i][2]>0.02) & (tick[i][3]<1) & (i<(tick.shape[0]-2*step)):
-            mysell+=tick[i+step][0]
-        else:
-            mysell+=tick[i][0]
-    buy=np.round(buy/num,8)
-    sell=np.round(sell/num,8)
-    mybuy=np.round(mybuy/num,8)
-    mysell=np.round(mysell/num,8)
-    mid=(buy+sell)/2
-    print(code,date,np.round(r2_score(target,predict),4),np.round(np.corrcoef(target,predict)[0][1],4))
-    #print(buy,sell,mid,mybuy,mybuy)
-    buyimprove=np.round((buy-mybuy)/buy,4)
-    sellimprove=np.round((mysell-sell)/sell,4)
-    buymidimprove=np.round((mid-mybuy)/mid,4)
-    sellmidimprove=np.round((mysell-mid)/mid,4)
-    print(buyimprove,sellimprove,buymidimprove,sellmidimprove)
-    print("==============================================================================")
+def pathCreate(path):
+    if os.path.exists(path)==False:
+        #logger.info(f'{path} is not exists! {path} will be created!')
+        try:
+            os.makedirs(path)
+        except:
+            pass
+        pas
+def saveDataFromInfluxdb(code,date,database,columns):
+    data=getDataFromInfluxdb(code,date,database,columns)
+    if data.shape[0]<100:
+        return
+    path=os.path.join(LOCALFeatureDATAPATH,'features')
+    pathCreate(path)
+    files=os.path.join(path,code+date+".h5")
+    with pd.HDFStore(files,'a',complib='blosc:zstd',append=True,complevel=9) as store:
+        store.append('data',data,append=True,format="table",data_columns=data.columns)
     pass
-#statistics('000021.SZ',20180111,gbm)
+
 stocks=getCodes()
-train_list=getDataList(stocks,startDate,endDate)
-
-test_list=getDataList(stocks,20180131,20180131)
-model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','20180130.txt')
-gbm = lgb.Booster(model_file=model_save_path)
-for item in test_list:
-    code=item['code']
-    date=item['date']
-    statistics(code,date,gbm)
-    #print(code,date)
-    #break
-    pass
-
-
+dataList=getDataList(stocks,startDate,endDate)
+Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
+        
+#gbm = lgb.Booster(model_file=model_save_path)
 

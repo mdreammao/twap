@@ -21,7 +21,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="mytwap.py" />
+    <Compile Include="dataPrepared.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="regression.py" />
     <Compile Include="simplelightgbm.py" />
     <Compile Include="twap.py" />
