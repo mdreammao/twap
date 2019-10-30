@@ -36,15 +36,13 @@ USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 
 
 
-BATCH_SIZE = 200
+BATCH_SIZE = 400
 SEQ_LENGTH = 10
 VALIDATION_SIZE = 5
 INLOOP_SIZE = 10000
-PREPARE_JOBS = 12   
-startDate=20180101
-endDate=20181231
-testStart=20190103
-testEnd=20190103
+PREPARE_JOBS = 16
+startDate=20180901
+endDate=20191025
 model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
 All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS
 
@@ -185,8 +183,8 @@ def getDataAssumble(prepared_data):
     return inputs,targets
     pass
 
-def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
-    model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel',endDate+'.txt')
+def mytrain(stocks,startDate,endDate,predictDate,BATCH_SIZE,testInputs, testTargets):
+    model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel',predictDate+'.txt')
     train_list=getDataList(stocks,startDate,endDate)
     batch_start, batch_end = 0, 0
     max_batch = len(train_list)
@@ -203,28 +201,21 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
             'learning_rate': 0.01,  # 学习速率
             'num_leaves': 1000,  # 叶子节点数
             'tree_learner': 'serial',
-            'min_data_in_leaf': 10,
+            'min_data_in_leaf': 100,
             'metric': ['l1', 'l2', 'rmse'],  # l1:mae, l2:mse  # 评估函数
-            'max_bin': 255,
-            'num_trees':1000,
-            'max_depth':50,
+            'max_bin': 100,
+            'num_trees':10000,
+            'max_depth':30,
             'num_threads':18,
             'verbose':1
 
     }
     while batch_start != max_batch:
-        batch_middle=min(max_batch-2, batch_start + BATCH_SIZE1)
-        batch_end = min(max_batch, batch_start + BATCH_SIZE1+BATCH_SIZE2)
-        #train_list_now = train_list[batch_start:batch_end ]
-        #prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in train_list_now)
-        #inputsAll,targetsAll=getDataAssumble(prepared_data)
-        #inputs,testInputs,targets, testTargets = train_test_split(inputsAll, targetsAll, test_size=0.2)
-        train_list_now = train_list[batch_start:batch_middle ]
-        test_list_now=train_list[batch_middle+1: batch_end]
+        batch_end = min(max_batch, batch_start + BATCH_SIZE)
+        train_list_now = train_list[batch_start:batch_end ]
         prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in train_list_now)
         inputs,targets=getDataAssumble(prepared_data)
-        prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in test_list_now)
-        testInputs,testTargets=getDataAssumble(prepared_data)
+
         batch_start=batch_start+BATCH_SIZE
         if (len(inputs)==0) | (len(testInputs)==0):
             continue
@@ -238,7 +229,7 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
                         valid_sets=lgb_eval,
                         init_model=gbm,  # 如果gbm不为None，那么就是在上次的基础上接着训练
                         # feature_name=x_cols,
-                        early_stopping_rounds=20,
+                        early_stopping_rounds=50,
                         verbose_eval=True,
                         keep_training_booster=True)
         # 输出模型评估分数
@@ -250,23 +241,37 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
                 % (score_train['l1'], score_train['l2'], score_train['rmse']))  
         print('当前模型在训练集的R2是：R2=%.4f'% (r2)) 
         gbm.save_model(model_save_path)
+        del prepared_data,inputs,targets
         current_loop+=1
-    pass
+    return gbm
 
 
 days=getTradedays(startDate,endDate)
 trainNum=20
 stocks=getCodes()
-train_list=getDataList(stocks,startDate,endDate)
-test_list=getDataList(stocks,testStart,testEnd)
-BATCH_SIZE1=(int)(round(0.7*BATCH_SIZE,0))
-BATCH_SIZE2=(int)(round(0.3*BATCH_SIZE,0))
 
 for i in range(trainNum,len(days)-1,1):
-    start0=days[i-trainNum]
-    end0=days[trainNum]
-    mytrain(stocks,start0,end0,BATCH_SIZE1,BATCH_SIZE2)
-    pass
+    trainStart=days[i-trainNum]
+    trainEnd=days[i-5]
+    valiDateStart=days[i-4]
+    valiDateEnd = days[i-1]
+    today=days[i]
+    valiDate_list = getDataList(stocks, valiDateStart, valiDateEnd)
+    load_index_list = np.random.permutation(len(valiDate_list))
+    batch_idx = load_index_list[0:BATCH_SIZE]
+    prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in [valiDate_list[z] for z in batch_idx])
+    valiDateInputs, valiDateTargets = getDataAssumble(prepared_data)
+    mygbm=mytrain(stocks,trainStart,trainEnd,today,BATCH_SIZE,valiDateInputs, valiDateTargets)
+    test_list = getDataList(stocks, today, today)
+    load_index_list = np.random.permutation(len(test_list))
+    batch_idx = load_index_list[0:min(BATCH_SIZE,len(test_list))]
+    prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database, All_COLUMNS) for o in [test_list[z] for z in batch_idx])
+    testInputs, testTargets = getDataAssumble(prepared_data)
+    predict = mygbm.predict(testInputs)
+    r2 = np.round(r2_score(testTargets, predict),4)
+    corr=np.round(np.corrcoef(testTargets,predict)[0][1],4)
+    print('当前模型在训练集的R2是：R2=%.4f  corr是：corr=%.4f' % (r2,corr))
+pass
 
 
 
