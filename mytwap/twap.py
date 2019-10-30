@@ -248,7 +248,7 @@ def statistics(code,date,model):
     mybuy=np.round(mybuy/num,8)
     mysell=np.round(mysell/num,8)
     mid=(buy+sell)/2
-    print(code,date,np.round(r2_score(target,predict),4),np.round(np.corrcoef(target,predict)[0][1],4))
+    print(code,date,np.round(r2_score(target[batch_flag == 0],predict[batch_flag == 0]),4),np.round(np.corrcoef(target[batch_flag == 0],predict[batch_flag == 0])[0][1],4))
     #print(buy,sell,mid,mybuy,mybuy)
     buyimprove=np.round((buy-mybuy)/buy,4)
     sellimprove=np.round((mysell-sell)/sell,4)
@@ -258,10 +258,10 @@ def statistics(code,date,model):
     print("==============================================================================")
     pass
 #statistics('000021.SZ',20180111,gbm)
-stocks=getCodes(300)
-
-test_list=getDataList(stocks,20180130,20180130)
-model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','20180130.txt')
+stocks=getCodes(500)
+stocks=['600000.SH']
+test_list=getDataList(stocks,20180403,20180403)
+model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','20180403.txt')
 gbm = lgb.Booster(model_file=model_save_path)
 for item in test_list:
     code=item['code']
