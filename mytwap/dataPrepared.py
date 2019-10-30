@@ -18,16 +18,16 @@ from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
 # GLOBAL PART
-# database='MaoTickFactors20190831'
-# INFLUXDBHOST='192.168.58.71'
-# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-# LOCALFeatureDATAPATH=r'd:/Data'
-# os.environ['NUMEXPR_MAX_THREADS'] = '8'
-LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-LOCALFeatureDATAPATH=r'/home/maoheng/Data'
-database='MaoTickFactors20191027'
-INFLUXDBHOST='192.168.38.2'
-os.environ['NUMEXPR_MAX_THREADS'] = '16'
+database='MaoTickFactors20190831'
+INFLUXDBHOST='192.168.58.71'
+LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+LOCALFeatureDATAPATH=r'd:/Data'
+os.environ['NUMEXPR_MAX_THREADS'] = '8'
+#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+#LOCALFeatureDATAPATH=r'/home/maoheng/Data'
+#database='MaoTickFactors20191027'
+#INFLUXDBHOST='192.168.38.2'
+
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
@@ -48,8 +48,13 @@ endDate=20191025
 
 
 
-def getCodes():
-    localFileStr=os.path.join(LOCALDATAPATH,'stockCode.h5')
+def getCodes(type=1000):
+    if (type==300):
+        localFileStr=os.path.join(LOCALDATAPATH,'stockCodes300.h5')
+    elif (type==500):
+        localFileStr=os.path.join(LOCALDATAPATH,'stockCodes500.h5')
+    else:
+        localFileStr=os.path.join(LOCALDATAPATH,'stockCode.h5')
     with pd.HDFStore(localFileStr,'r',complib='blosc:zstd',append=False,complevel=9) as store:
         stockCodes=store['data']
     return list(stockCodes)
@@ -185,17 +190,20 @@ def saveDataFromInfluxdb(code,date,database,columns):
     else:
         print(f'data of {code} in {date} has already exits!')
 def getDataFromH5(code,date,columns):
+    code=str(code)
+    date=str(date)
     #code=code.replace('.','_')
     file=os.path.join(LOCALFeatureDATAPATH,'features',date,code+".h5")
-    if (os.path.isfile(file)==False):
+    if (os.path.isfile(file)==True):
         with pd.HDFStore(file,'r',complib='blosc:zstd',append=False,complevel=9) as store:
             data=store['data']
         return data[columns]
     else:
         return pd.DataFrame()
 stocks=getCodes()
-dataList=getDataList(stocks,20180116,20180331)
-Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
-
+dataList=getDataList(stocks,20180901,20180915)
+#Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
+data=getDataFromH5('600000.SH',20180903,All_COLUMNS)  
+print('ok!')
 #gbm = lgb.Booster(model_file=model_save_path)
 
