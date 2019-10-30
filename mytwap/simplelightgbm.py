@@ -10,7 +10,7 @@ import dateutil.parser as dtparser
 import datetime
 import torch
 import os
-os.environ['NUMEXPR_MAX_THREADS'] = '6'
+os.environ['NUMEXPR_MAX_THREADS'] = '30'
 import warnings
 warnings.filterwarnings("ignore") 
 import time
@@ -20,18 +20,22 @@ from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
 # GLOBAL PART
-file=os.path.join(r'd:/BTP/LocalDataBase','normalization20190712.h5')
+#LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+#database='MaoTickFactors20190831'
+#INFLUXDBHOST='192.168.58.71'
+LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+database='MaoTickFactors20191027'
+INFLUXDBHOST='192.168.38.2'
+file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
 #TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
 TARGET_COLUMNS = ['midIncreaseNext1m']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
-#startDate=20180401
-#endDate=20190628
-database='MaoTickFactors20190831'
-INFLUXDBHOST='192.168.58.71'
-LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+
+
+
 BATCH_SIZE = 200
 SEQ_LENGTH = 10
 VALIDATION_SIZE = 5
@@ -193,9 +197,9 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
             'task': 'train',
             'application': 'regression',  # 目标函数
             #'application': 'quantile',  # 目标函数
-            #'boosting_type': 'gbdt',  # 设置提升类型
-            'boosting_type': 'dart',  # 设置提升类型
-            'drop_rate':0.8,
+            'boosting_type': 'gbdt',  # 设置提升类型
+            #'boosting_type': 'dart',  # 设置提升类型
+            #'drop_rate' : 0.8,
             'learning_rate': 0.01,  # 学习速率
             'num_leaves': 1000,  # 叶子节点数
             'tree_learner': 'serial',
@@ -204,9 +208,9 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
             'max_bin': 255,
             'num_trees':1000,
             'max_depth':50,
-            'num_threads':8,
-            #'feature_fraction':1,
+            'num_threads':18,
             'verbose':1
+
     }
     while batch_start != max_batch:
         batch_middle=min(max_batch-2, batch_start + BATCH_SIZE1)
