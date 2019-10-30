@@ -165,7 +165,7 @@ def modifyData(batch_X, batch_y, batch_flag):
     batch_seq_y[np.isnan(batch_seq_y)]=0
     return batch_seq_X,batch_seq_y.flatten(),na_idx
 
-gbm = lgb.Booster(model_file=model_save_path)
+
 
 def statistics(code,date,model):
     batch_X, batch_y, batch_flag,mytime=get_tick_data(code,date,database, All_COLUMNS)
