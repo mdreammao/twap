@@ -18,16 +18,16 @@ from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
 # GLOBAL PART
-database='MaoTickFactors20190831'
-INFLUXDBHOST='192.168.58.71'
-LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-LOCALFeatureDATAPATH=r'd:/Data'
-os.environ['NUMEXPR_MAX_THREADS'] = '8'
-#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-#LOCALFeatureDATAPATH=r'/home/maoheng/Data'
-#database='MaoTickFactors20191027'
-#INFLUXDBHOST='192.168.38.2'
-
+# database='MaoTickFactors20190831'
+# INFLUXDBHOST='192.168.58.71'
+# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+# LOCALFeatureDATAPATH=r'd:/Data'
+# os.environ['NUMEXPR_MAX_THREADS'] = '8'
+LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+LOCALFeatureDATAPATH=r'/home/maoheng/Data'
+database='MaoTickFactors20191027'
+INFLUXDBHOST='192.168.38.2'
+os.environ['NUMEXPR_MAX_THREADS'] = '16'
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
@@ -194,8 +194,8 @@ def getDataFromH5(code,date,columns):
     else:
         return pd.DataFrame()
 stocks=getCodes()
-dataList=getDataList(stocks,20180901,20181231)
+dataList=getDataList(stocks,20180116,20180331)
 Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
-        
+
 #gbm = lgb.Booster(model_file=model_save_path)
 

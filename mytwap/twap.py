@@ -30,8 +30,8 @@ file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
-#TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
-TARGET_COLUMNS = ['midIncreaseNext1m']
+TARGET_COLUMNS = ['midIncreaseNext1m','buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
+#TARGET_COLUMNS = ['midIncreaseNext1m']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 #startDate=20180401
 #endDate=20190628
