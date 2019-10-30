@@ -195,6 +195,7 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
             #'application': 'quantile',  # 目标函数
             #'boosting_type': 'gbdt',  # 设置提升类型
             'boosting_type': 'dart',  # 设置提升类型
+            'drop_rate':0.8,
             'learning_rate': 0.01,  # 学习速率
             'num_leaves': 1000,  # 叶子节点数
             'tree_learner': 'serial',
@@ -204,7 +205,7 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
             'num_trees':1000,
             'max_depth':50,
             'num_threads':8,
-            'feature_fraction':1,
+            #'feature_fraction':1,
             'verbose':1
     }
     while batch_start != max_batch:
@@ -234,7 +235,7 @@ def mytrain(stocks,startDate,endDate,BATCH_SIZE1,BATCH_SIZE2):
                         init_model=gbm,  # 如果gbm不为None，那么就是在上次的基础上接着训练
                         # feature_name=x_cols,
                         early_stopping_rounds=20,
-                        verbose_eval=False,
+                        verbose_eval=True,
                         keep_training_booster=True)
         # 输出模型评估分数
         score_train = dict([(s[1], s[2]) for s in gbm.eval_train()])

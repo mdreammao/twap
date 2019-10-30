@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>ba9e9ba4-b4d3-48f3-9246-82d77c55d8bf</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>mytwap.py</StartupFile>
+    <StartupFile>simplelightgbm.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
