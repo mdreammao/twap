@@ -18,19 +18,22 @@ from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
 # GLOBAL PART
-# database='MaoTickFactors20190831'
-# INFLUXDBHOST='192.168.58.71'
-# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-LOCALFeatureDATAPATH=r'/home/maoheng/Data'
-database='MaoTickFactors20191027'
-INFLUXDBHOST='192.168.38.2'
-os.environ['NUMEXPR_MAX_THREADS'] = '4'
+database='MaoTickFactors20190831'
+INFLUXDBHOST='192.168.58.71'
+LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+LOCALFeatureDATAPATH=r'd:/Data'
+os.environ['NUMEXPR_MAX_THREADS'] = '8'
+#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+#LOCALFeatureDATAPATH=r'/home/maoheng/Data'
+#database='MaoTickFactors20191027'
+#INFLUXDBHOST='192.168.38.2'
+
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
-TARGET_COLUMNS = ['midIncreaseNext1m','buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
+#TARGET_COLUMNS = ['midIncreaseNext1m','buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
+TARGET_COLUMNS = ['midIncreaseNext1m']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS+['B1','S1']
 
@@ -39,7 +42,7 @@ BATCH_SIZE = 200
 SEQ_LENGTH = 10
 VALIDATION_SIZE = 5
 INLOOP_SIZE = 10000
-PREPARE_JOBS = 8   
+PREPARE_JOBS = -1   
 startDate=20180901
 endDate=20191025
 
@@ -165,21 +168,33 @@ def pathCreate(path):
         try:
             os.makedirs(path)
         except:
+            print(f'create {path} error!')
             pass
-        pas
 def saveDataFromInfluxdb(code,date,database,columns):
     data=getDataFromInfluxdb(code,date,database,columns)
     if data.shape[0]<100:
         return
-    path=os.path.join(LOCALFeatureDATAPATH,'features')
+    #code=code.replace('.','_')
+    path=os.path.join(LOCALFeatureDATAPATH,'features',date)
     pathCreate(path)
-    files=os.path.join(path,code+date+".h5")
-    with pd.HDFStore(files,'a',complib='blosc:zstd',append=True,complevel=9) as store:
-        store.append('data',data,append=True,format="table",data_columns=data.columns)
-    pass
-
+    files=os.path.join(path,code+".h5")
+    if (os.path.isfile(files)==False):
+        
+        with pd.HDFStore(files,'a',complib='blosc:zstd',append=False,complevel=9) as store:
+            store.append('data',data,append=False,format="table",data_columns=data.columns)
+    else:
+        print(f'data of {code} in {date} has already exits!')
+def getDataFromH5(code,date,columns):
+    #code=code.replace('.','_')
+    file=os.path.join(LOCALFeatureDATAPATH,'features',date,code+".h5")
+    if (os.path.isfile(file)==False):
+        with pd.HDFStore(file,'r',complib='blosc:zstd',append=False,complevel=9) as store:
+            data=store['data']
+        return data[columns]
+    else:
+        return pd.DataFrame()
 stocks=getCodes()
-dataList=getDataList(stocks,startDate,endDate)
+dataList=getDataList(stocks,20180901,20181231)
 Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
         
 #gbm = lgb.Booster(model_file=model_save_path)

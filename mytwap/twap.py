@@ -20,13 +20,12 @@ import lightgbm as lgb
 
 
 # GLOBAL PART
-# database='MaoTickFactors20190831'
-# INFLUXDBHOST='192.168.58.71'
-# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-database='MaoTickFactors20191027'
-INFLUXDBHOST='192.168.38.2'
-os.environ['NUMEXPR_MAX_THREADS'] = '4'
+database='MaoTickFactors20190831'
+INFLUXDBHOST='192.168.58.71'
+LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+#database='MaoTickFactors20191027'
+#INFLUXDBHOST='192.168.38.2'
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
