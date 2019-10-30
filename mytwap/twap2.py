@@ -1,3 +1,4 @@
+
 import influxdb
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,6 +22,7 @@ import lightgbm as lgb
 
 # GLOBAL PART
 database='MaoTickFactors20190831'
+predictdatabase='MaoTickPredict20190909'
 INFLUXDBHOST='192.168.58.71'
 LOCALDATAPATH=r'd:/BTP/LocalDataBase'
 LOCALFeatureDATAPATH=r'd:/Data'
@@ -205,23 +207,14 @@ def modifyData(batch_X, batch_y, batch_flag):
 
 
 
-def statistics(code,date,model):
+def statistics(code,date):
    # batch_X, batch_y, batch_flag,mytime=get_tick_data_fromh5(code,date,All_COLUMNS)
-    batch_X, batch_y, batch_flag,mytime=get_tick_data(code,date,database,All_COLUMNS)
-    if (batch_X.shape[0]<1000):
+   # batch_X, batch_y, batch_flag,mytime=get_tick_data(code,date,database,All_COLUMNS)
+    predictDf=getDataFromInfluxdb(code,date,predictdatabase,['predictMaxNext1m','predictMinNext1m'])
+    if (predictDf.shape[0]<1000):
         return 
-    
-    input,target,flag=  modifyData( batch_X, batch_y, batch_flag) 
-    predict=gbm.predict(input)
-    predictDf=pd.DataFrame(index=mytime)
-    predictDf['predict']=predict
-    predictDf['target']=target
-    predictDf['flag']=flag
-    #tickData=getDataFromH5(code,date,['B1','S1'])
     tickData=getDataFromInfluxdb(code,date,database,['B1','S1'])
-    #if tickData['B1'].mean()<10:
-    #    return
-    tickData[['predict','target','flag']]=predictDf[['predict','target','flag']]
+    tickData[['predictMaxNext1m','predictMinNext1m']]=predictDf[['predictMaxNext1m','predictMinNext1m']]
     tick=tickData.values
     buy=0
     sell=0
@@ -234,12 +227,12 @@ def statistics(code,date,model):
         sell+=tick[i][0]
         num=num+1
         #如果要跌，等等再买
-        if (tick[i][2]<-0.015) & (tick[i][3]<1) & (i<(tick.shape[0]-2*step)):
+        if (tick[i][2]<-0.02)& (i<(tick.shape[0]-2*step)):
             mybuy+=tick[i+step][1]
         else:
             mybuy+=tick[i][1]
         #如果要涨，等等再卖
-        if (tick[i][2]>0.015) & (tick[i][3]<1) & (i<(tick.shape[0]-2*step)):
+        if (tick[i][3]>0.02) &(i<(tick.shape[0]-2*step)):
             mysell+=tick[i+step][0]
         else:
             mysell+=tick[i][0]
@@ -248,7 +241,7 @@ def statistics(code,date,model):
     mybuy=np.round(mybuy/num,8)
     mysell=np.round(mysell/num,8)
     mid=(buy+sell)/2
-    print(code,date,np.round(r2_score(target,predict),4),np.round(np.corrcoef(target,predict)[0][1],4))
+    #print(code,date,np.round(r2_score(target,predict),4),np.round(np.corrcoef(target,predict)[0][1],4))
     #print(buy,sell,mid,mybuy,mybuy)
     buyimprove=np.round((buy-mybuy)/buy,4)
     sellimprove=np.round((mysell-sell)/sell,4)
@@ -258,15 +251,13 @@ def statistics(code,date,model):
     print("==============================================================================")
     pass
 #statistics('000021.SZ',20180111,gbm)
-stocks=getCodes(300)
+stocks=getCodes(500)
 
-test_list=getDataList(stocks,20180130,20180130)
-model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','20180130.txt')
-gbm = lgb.Booster(model_file=model_save_path)
+test_list=getDataList(stocks,20190111,20190111)
 for item in test_list:
     code=item['code']
     date=item['date']
-    statistics(code,date,gbm)
+    statistics(code,date)
     #print(code,date)
     #break
     pass

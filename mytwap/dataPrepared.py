@@ -48,8 +48,13 @@ endDate=20191025
 
 
 
-def getCodes():
-    localFileStr=os.path.join(LOCALDATAPATH,'stockCode.h5')
+def getCodes(type=1000):
+    if (type==300):
+        localFileStr=os.path.join(LOCALDATAPATH,'stockCodes300.h5')
+    elif (type==500):
+        localFileStr=os.path.join(LOCALDATAPATH,'stockCodes500.h5')
+    else:
+        localFileStr=os.path.join(LOCALDATAPATH,'stockCode.h5')
     with pd.HDFStore(localFileStr,'r',complib='blosc:zstd',append=False,complevel=9) as store:
         stockCodes=store['data']
     return list(stockCodes)
