@@ -36,10 +36,10 @@ with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store
 FEATURE_COLUMNS =list(mynormalization['name'])
 #TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
 TARGET_COLUMNS = ['midIncreaseNext1m']
-TARGET_COLUMNS = ['midIncreaseNext1m']
-#TARGET_COLUMNS = ['buyPriceIncreaseNext15s']
+#TARGET_COLUMNS = ['midIncreaseNext1m']
+TARGET_COLUMNS = ['buyPriceIncreaseNext15s']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
-DataSource='h5'
+DataSource='influxdb'
 
 
 BATCH_SIZE = 1000
@@ -371,11 +371,11 @@ days=getTradedays(20190101,20191025)
 trainNum=244
 #stocks=['600000.SH']
 
-stocks=getCodes(300)
+stocks=getCodes(500)
 trainStart=20180901
 trainEnd=20190131
 today=20190201
-mygbm=mytrain2(stocks,trainStart,trainEnd,'hs300',BATCH_SIZE)
+mygbm=mytrain2(stocks,trainStart,trainEnd,'csi50015s',BATCH_SIZE)
 test_list = getDataList(stocks, today, today)
 load_index_list = np.random.permutation(len(test_list))
 batch_idx = load_index_list[0:min(VALIDATION_SIZE,len(test_list))]
