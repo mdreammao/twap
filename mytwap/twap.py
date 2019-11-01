@@ -260,27 +260,86 @@ def statistics(code,date,model):
     print("==============================================================================")
     pass
 
+def mystrategy(code,date,model):
+    # batch_X, batch_y, batch_flag,mytime=get_tick_data_fromh5(code,date,All_COLUMNS)
+    batch_X, batch_y, batch_flag, mytime = get_tick_data(code, date, database, All_COLUMNS)
+    if (batch_X.shape[0] < 1000):
+        return
 
+    input, target, flag = modifyData(batch_X, batch_y, batch_flag)
+    predict = model.predict(input)
+    predictDf = pd.DataFrame(index=mytime)
+    predictDf['predict'] = predict
+    predictDf['target'] = target
+    predictDf['flag'] = flag
+    # tickData=getDataFromH5(code,date,['B1','S1'])
+    tickData = getDataFromInfluxdb(code, date, database, ['B1', 'S1'])
+    tickData[['predict', 'target', 'flag']] = predictDf[['predict', 'target', 'flag']]
+    tick = tickData.values
+    buy = 0
+    sell = 0
+    mybuy = 0
+    mysell = 0
+    num = 0
+    step = 20
+    for i in range(0, tick.shape[0] - 1, step):
+        buy += tick[i][1]
+        sell += tick[i][0]
+        num = num + 1
+        # 如果要跌，等等再买
+        if (tick[i][2] < -0.015) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
+            mybuy += tick[i + step][1]
+        else:
+            mybuy += tick[i][1]
+        # 如果要涨，等等再卖
+        if (tick[i][2] > 0.015) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
+            mysell += tick[i + step][0]
+        else:
+            mysell += tick[i][0]
+    buy = np.round(buy / num, 8)
+    sell = np.round(sell / num, 8)
+    mybuy = np.round(mybuy / num, 8)
+    mysell = np.round(mysell / num, 8)
+    mid = (buy + sell) / 2
+    r2=np.round(r2_score(target[flag == 0], predict[flag == 0]), 4)
+    mycorr=np.round(np.corrcoef(target[flag == 0], predict[flag == 0])[0][1], 4)
+    #print(code, date, np.round(r2_score(target[flag == 0], predict[flag == 0]), 4),np.round(np.corrcoef(target[flag == 0], predict[flag == 0])[0][1], 4))
+    # print(buy,sell,mid,mybuy,mybuy)
+    buyimprove = np.round((buy - mybuy) / buy, 4)
+    sellimprove = np.round((mysell - sell) / sell, 4)
+    buymidimprove = np.round((mid - mybuy) / mid, 4)
+    sellmidimprove = np.round((mysell - mid) / mid, 4)
+    #print(buyimprove, sellimprove, buymidimprove, sellmidimprove)
+    #print("==============================================================================")
+    result={'code':code,'date':date,'buyimprove':buyimprove,'sellimprove':sellimprove,'r2':r2,'corr':mycorr}
+    result=pd.DataFrame(data=result)
+    return result
+def mybacktest(stocks,mystart,myend,model):
+    backtestList = getDataList(stocks, mystart, myend)
+    result=Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(mystrategy)(o['code'], o['date'], model) for o in backtestList)
+    result=pd.concat(data=result)
+    return result
+    pass
 
 #stocks=getCodes(500)
 stocks=['600000.SH']
 days=getTradedays(20180103,20191025)
 mystart=20190101
-myend=20190830
+myend=20190105
 
-stockList=getDataList(stocks,mystart,myend)
+
 fileName='dart05020180102.txt'
 model_save_path = os.path.join(LOCALDATAPATH, 'lightgbmModel', fileName)
 gbm = lgb.Booster(model_file=model_save_path)
+mybacktest(stocks,mystart,myend)
 
-
-for date in days:
-    for code in stocks:
-        model_save_path = os.path.join(LOCALDATAPATH, 'lightgbmModel', str(date)+'.txt')
-        gbm = lgb.Booster(model_file=model_save_path)
-        statistics(code, date, gbm)
-        pass
-    pass
+# for date in days:
+#     for code in stocks:
+#         model_save_path = os.path.join(LOCALDATAPATH, 'lightgbmModel', str(date)+'.txt')
+#         gbm = lgb.Booster(model_file=model_save_path)
+#         statistics(code, date, gbm)
+#         pass
+#     pass
 
 
 
