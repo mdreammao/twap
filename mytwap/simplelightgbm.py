@@ -35,8 +35,8 @@ with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
 #TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
-#TARGET_COLUMNS = ['midIncreaseNext1m']
-TARGET_COLUMNS = ['buyPriceIncreaseNext15s']
+TARGET_COLUMNS = ['midIncreaseNext1m']
+#TARGET_COLUMNS = ['buyPriceIncreaseNext15s']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 
 
@@ -295,8 +295,8 @@ def mytrain(stocks,startDate,endDate,predictDate,BATCH_SIZE,testInputs, testTarg
         break
     return gbm
 
-def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
-    model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','15s'+predictDate+'.txt')
+def mytrain2(stocks,startDate,endDate,name,BATCH_SIZE):
+    model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel',name+'.txt')
     train_list=getDataList(stocks,startDate,endDate)
     batch_start, batch_end = 0, 0
     max_batch = len(train_list)
@@ -311,7 +311,7 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
             'boosting_type': 'dart',  # 设置提升类型
             'drop_rate' : 0.5,
             'learning_rate': 0.01,  # 学习速率
-            'num_leaves': 5000,  # 叶子节点数
+            'num_leaves': 2000,  # 叶子节点数
             'tree_learner': 'serial',
             'min_data_in_leaf': 100,
             'metric': ['l1', 'l2', 'rmse'],  # l1:mae, l2:mse  # 评估函数
@@ -361,30 +361,50 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
 
             break
     return gbm
-days=getTradedays(20170101,20191025)
+days=getTradedays(20190101,20191025)
 trainNum=244
-stocks=getCodes(500)
 #stocks=['600000.SH']
 
-for i in range(trainNum,len(days)-1,100):
-    trainStart=days[i-trainNum]
-    trainEnd=days[i-1]
-    today=days[i]
-    mygbm=mytrain2(stocks,trainStart,trainEnd,today,BATCH_SIZE)
-    test_list = getDataList(stocks, today, today)
-    load_index_list = np.random.permutation(len(test_list))
-    batch_idx = load_index_list[0:min(VALIDATION_SIZE,len(test_list))]
-    prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database,All_COLUMNS) for o in [test_list[z] for z in batch_idx])
-    #prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_fromh5)(o['code'], o['date'], All_COLUMNS) for o in [test_list[z] for z in batch_idx])
-    testInputs, testTargets = getDataAssumble(prepared_data)
-    predict = mygbm.predict(testInputs)
-    r2 = np.round(r2_score(testTargets, predict),4)
-    corr=np.round(np.corrcoef(testTargets,predict)[0][1],4)
-    print(f'today: {today} code: {stocks} ')
-    print('当前模型在训练集的R2是：R2=%.4f  corr是：corr=%.4f' % (r2,corr))
-    del prepared_data
-    print("==============================================================")
-pass
+stocks=getCodes(300)
+trainStart=20180901
+trainEnd=20190131
+today=20190201
+mygbm=mytrain2(stocks,trainStart,trainEnd,'hs300',BATCH_SIZE)
+test_list = getDataList(stocks, today, today)
+load_index_list = np.random.permutation(len(test_list))
+batch_idx = load_index_list[0:min(VALIDATION_SIZE,len(test_list))]
+prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database,All_COLUMNS) for o in [test_list[z] for z in batch_idx])
+#prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_fromh5)(o['code'], o['date'], All_COLUMNS) for o in [test_list[z] for z in batch_idx])
+testInputs, testTargets = getDataAssumble(prepared_data)
+predict = mygbm.predict(testInputs)
+r2 = np.round(r2_score(testTargets, predict),4)
+corr=np.round(np.corrcoef(testTargets,predict)[0][1],4)
+print(f'today: {today} code: {stocks} ')
+print('当前模型在训练集的R2是：R2=%.4f  corr是：corr=%.4f' % (r2,corr))
+del prepared_data
+print("==============================================================")
+
+
+
+# for i in range(trainNum,len(days)-1,100):
+#     trainStart=days[i-trainNum]
+#     trainEnd=days[i-1]
+#     today=days[i]
+#     mygbm=mytrain2(stocks,trainStart,trainEnd,today,BATCH_SIZE)
+#     test_list = getDataList(stocks, today, today)
+#     load_index_list = np.random.permutation(len(test_list))
+#     batch_idx = load_index_list[0:min(VALIDATION_SIZE,len(test_list))]
+#     prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database,All_COLUMNS) for o in [test_list[z] for z in batch_idx])
+#     #prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_fromh5)(o['code'], o['date'], All_COLUMNS) for o in [test_list[z] for z in batch_idx])
+#     testInputs, testTargets = getDataAssumble(prepared_data)
+#     predict = mygbm.predict(testInputs)
+#     r2 = np.round(r2_score(testTargets, predict),4)
+#     corr=np.round(np.corrcoef(testTargets,predict)[0][1],4)
+#     print(f'today: {today} code: {stocks} ')
+#     print('当前模型在训练集的R2是：R2=%.4f  corr是：corr=%.4f' % (r2,corr))
+#     del prepared_data
+#     print("==============================================================")
+# pass
 
 #for i in range(trainNum,len(days)-1,1):
 #    trainStart=days[i-trainNum]
