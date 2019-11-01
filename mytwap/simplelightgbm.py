@@ -36,9 +36,10 @@ with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store
 FEATURE_COLUMNS =list(mynormalization['name'])
 #TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
 TARGET_COLUMNS = ['midIncreaseNext1m']
+TARGET_COLUMNS = ['midIncreaseNext1m']
 #TARGET_COLUMNS = ['buyPriceIncreaseNext15s']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
-
+DataSource='h5'
 
 
 BATCH_SIZE = 1000
@@ -72,25 +73,7 @@ def getTradedays(startDate,endDate):
     mydata=mydata.loc[(mydata['date']>=startDate) &(mydata['date']<=endDate),'date']
     return (list(mydata))
     pass
-def getDataFromInfluxdb(code,date,database,columns=[]):
-    client = influxdb.DataFrameClient(host=INFLUXDBHOST, port=8086, username='root', password='root', database=database)
-    measure=code
-    b = dtparser.parse(str(date))+ datetime.timedelta(hours=0)
-    e = dtparser.parse(str(date)) + datetime.timedelta(hours=24)
-    colstr=''
-    if len(columns)>0:
-        for col in columns:
-            colstr=colstr+f""" "{col}", """
-        colstr=colstr[:-2]
-    else:
-        colstr='*'
-    query=f""" select {colstr} from "{database}"."autogen"."{measure}" where time >= {int(b.timestamp() * 1000 * 1000 * 1000)} and time < {int(e.timestamp() * 1000 * 1000* 1000)} """
-    result=client.query(query)
-    if result!={}:
-        data=pd.DataFrame(result[measure])
-    else:
-        data=pd.DataFrame()
-    return data
+
 def getDataList(codes,startDate,endDate):
     days=getTradedays(startDate,endDate)
     mylist=[]
@@ -123,7 +106,25 @@ def dataNormalization(dataAll,normalization):
     
     return dataAll
     pass
-
+def getDataFromInfluxdb(code,date,database,columns=[]):
+    client = influxdb.DataFrameClient(host=INFLUXDBHOST, port=8086, username='root', password='root', database=database)
+    measure=code
+    b = dtparser.parse(str(date))+ datetime.timedelta(hours=0)
+    e = dtparser.parse(str(date)) + datetime.timedelta(hours=24)
+    colstr=''
+    if len(columns)>0:
+        for col in columns:
+            colstr=colstr+f""" "{col}", """
+        colstr=colstr[:-2]
+    else:
+        colstr='*'
+    query=f""" select {colstr} from "{database}"."autogen"."{measure}" where time >= {int(b.timestamp() * 1000 * 1000 * 1000)} and time < {int(e.timestamp() * 1000 * 1000* 1000)} """
+    result=client.query(query)
+    if result!={}:
+        data=pd.DataFrame(result[measure])
+    else:
+        data=pd.DataFrame()
+    return data
 def getDataFromH5(code,date,columns):
     code=str(code)
     date=str(date)
@@ -135,38 +136,43 @@ def getDataFromH5(code,date,columns):
         return data[columns]
     else:
         return pd.DataFrame()
+def getData(code,date,columns):
+    if (DataSource=='h5'):
+        return getDataFromH5(code,date,columns)
+    else:
+        return getDataFromInfluxdb(code,date,database,columns)
+    pass
+#def get_tick_data_fromh5(code,date,columns=All_COLUMNS):
+#    try:
 
-def get_tick_data_fromh5(code,date,columns=All_COLUMNS):
-    try:
-
-        tick_data = getDataFromH5(code,date,columns)
-        if tick_data.shape[0]==0:
-            #print(f'data of {code} in {date} from {database} has error!!!')
-            return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
-        ##标准化
-        tick_data=dataNormalization(tick_data,mynormalization)
-        # replace inf to na
-        tick_data = tick_data.replace(np.inf, np.nan)
-        tick_data = tick_data.replace(-np.inf, np.nan)
-        ##去掉开头和结尾的nan
-        startIndex=tick_data[tick_data.isna().sum(axis=1)==0].index[0]
-        endIndex=tick_data[tick_data.isna().sum(axis=1)==0].index[-1]
-        tick_data=tick_data.loc[startIndex:endIndex,:]
-        ## split X, y 
-        X = tick_data[FEATURE_COLUMNS].values
-        padding = np.zeros((SEQ_LENGTH-1, X.shape[1]))
-        y = 100*tick_data[TARGET_COLUMNS].values
-        #y=np.clip(y,a_min=-1,a_max=1)/6
-        flag = tick_data['realData'].values
-        del tick_data
-        return np.concatenate((padding, X), axis=0), y, flag
-    except:
-        #print(f'data of {code} in {date} from {database} has error!!!')
-        return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
+#        tick_data = getData(code,date,columns)
+#        if tick_data.shape[0]==0:
+#            #print(f'data of {code} in {date} from {database} has error!!!')
+#            return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
+#        ##标准化
+#        tick_data=dataNormalization(tick_data,mynormalization)
+#        # replace inf to na
+#        tick_data = tick_data.replace(np.inf, np.nan)
+#        tick_data = tick_data.replace(-np.inf, np.nan)
+#        ##去掉开头和结尾的nan
+#        startIndex=tick_data[tick_data.isna().sum(axis=1)==0].index[0]
+#        endIndex=tick_data[tick_data.isna().sum(axis=1)==0].index[-1]
+#        tick_data=tick_data.loc[startIndex:endIndex,:]
+#        ## split X, y
+#        X = tick_data[FEATURE_COLUMNS].values
+#        padding = np.zeros((SEQ_LENGTH-1, X.shape[1]))
+#        y = 100*tick_data[TARGET_COLUMNS].values
+#        #y=np.clip(y,a_min=-1,a_max=1)/6
+#        flag = tick_data['realData'].values
+#        del tick_data
+#        return np.concatenate((padding, X), axis=0), y, flag
+#    except:
+#        #print(f'data of {code} in {date} from {database} has error!!!')
+#        return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))
 def get_tick_data(code,date,database,columns=All_COLUMNS):
     try:
 
-        tick_data = getDataFromInfluxdb(code,date,database,columns)
+        tick_data = getData(code,date,columns)
         if tick_data.shape[0]==0:
             #print(f'data of {code} in {date} from {database} has error!!!')
             return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1))

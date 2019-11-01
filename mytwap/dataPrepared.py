@@ -21,7 +21,7 @@ import lightgbm as lgb
 database='MaoTickFactors20190831'
 INFLUXDBHOST='192.168.58.71'
 LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-LOCALFeatureDATAPATH=r'd:/Data'
+LOCALFeatureDATAPATH=r'F:/Data'
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 #LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
 #LOCALFeatureDATAPATH=r'/home/maoheng/Data'
@@ -44,7 +44,7 @@ VALIDATION_SIZE = 5
 INLOOP_SIZE = 10000
 PREPARE_JOBS = -1   
 startDate=20180901
-endDate=20191025
+endDate=20190831
 
 
 
@@ -201,9 +201,9 @@ def getDataFromH5(code,date,columns):
     else:
         return pd.DataFrame()
 stocks=getCodes()
-dataList=getDataList(stocks,20180901,20180915)
-#Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
-data=getDataFromH5('600000.SH',20180903,All_COLUMNS)  
+dataList=getDataList(stocks,startDate,endDate)
+Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(saveDataFromInfluxdb)(o['code'], o['date'], database, All_COLUMNS) for o in dataList)
+#data=getDataFromH5('600000.SH',20180903,All_COLUMNS)  
 print('ok!')
 #gbm = lgb.Booster(model_file=model_save_path)
 
