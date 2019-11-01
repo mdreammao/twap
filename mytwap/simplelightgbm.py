@@ -20,33 +20,35 @@ from numpy.lib.stride_tricks import as_strided
 import lightgbm as lgb
 
 # GLOBAL PART
-LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-database='MaoTickFactors20190831'
-INFLUXDBHOST='192.168.58.71'
-os.environ['NUMEXPR_MAX_THREADS'] = '12'
-LOCALFeatureDATAPATH=r'd:/Data'
-#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-#database='MaoTickFactors20191027'
-#INFLUXDBHOST='192.168.38.2'
-#os.environ['NUMEXPR_MAX_THREADS'] = '30'
+# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+# database='MaoTickFactors20190831'
+# INFLUXDBHOST='192.168.58.71'
+# os.environ['NUMEXPR_MAX_THREADS'] = '12'
+# LOCALFeatureDATAPATH=r'd:/Data'
+LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+database='MaoTickFactors20191027'
+INFLUXDBHOST='192.168.38.2'
+os.environ['NUMEXPR_MAX_THREADS'] = '30'
+LOCALFeatureDATAPATH=r'/home/maoheng/Data'
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
 #TARGET_COLUMNS = ['buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
-TARGET_COLUMNS = ['midIncreaseNext1m']
+#TARGET_COLUMNS = ['midIncreaseNext1m']
+TARGET_COLUMNS = ['buyPriceIncreaseNext15s']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 
 
 
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 SEQ_LENGTH = 10
-VALIDATION_SIZE = 5
+VALIDATION_SIZE = 100
 INLOOP_SIZE = 10000
 PREPARE_JOBS = -1
 startDate=20180901
 endDate=20180915
-model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
+#model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel.txt')
 All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS
 
 def getCodes(type=1000):
@@ -245,14 +247,14 @@ def mytrain(stocks,startDate,endDate,predictDate,BATCH_SIZE,testInputs, testTarg
            # 'boosting_type': 'dart',  # 设置提升类型
             #'drop_rate' : 0.8,
             'learning_rate': 0.01,  # 学习速率
-            'num_leaves': 1000,  # 叶子节点数
+            'num_leaves': 10000,  # 叶子节点数
             'tree_learner': 'serial',
             'min_data_in_leaf': 10,
             'metric': ['l1', 'l2', 'rmse'],  # l1:mae, l2:mse  # 评估函数
-            'max_bin': 100,
-            'num_trees':100,
-            'max_depth':50,
-            'num_threads':8,
+            'max_bin': 255,
+            'num_trees':200,
+            'max_depth':30,
+            'num_threads':18,
             #'verbose':1
 
     }
@@ -272,7 +274,7 @@ def mytrain(stocks,startDate,endDate,predictDate,BATCH_SIZE,testInputs, testTarg
         lgb_eval = lgb.Dataset(testInputs, testTargets, reference=lgb_train)
         gbm = lgb.train(params,
                         lgb_train,
-                        num_boost_round=500,
+                        num_boost_round=1000,
                         valid_sets=lgb_eval,
                         init_model=gbm,  # 如果gbm不为None，那么就是在上次的基础上接着训练
                         # feature_name=x_cols,
@@ -294,7 +296,7 @@ def mytrain(stocks,startDate,endDate,predictDate,BATCH_SIZE,testInputs, testTarg
     return gbm
 
 def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
-    model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel',predictDate+'.txt')
+    model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','15s'+predictDate+'.txt')
     train_list=getDataList(stocks,startDate,endDate)
     batch_start, batch_end = 0, 0
     max_batch = len(train_list)
@@ -305,18 +307,18 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
             'task': 'train',
             'application': 'regression',  # 目标函数
             #'application': 'quantile',  # 目标函数
-            'boosting_type': 'gbdt',  # 设置提升类型
-           # 'boosting_type': 'dart',  # 设置提升类型
-            #'drop_rate' : 0.8,
+            #'boosting_type': 'gbdt',  # 设置提升类型
+            'boosting_type': 'dart',  # 设置提升类型
+            'drop_rate' : 0.5,
             'learning_rate': 0.01,  # 学习速率
-            'num_leaves': 2000,  # 叶子节点数
+            'num_leaves': 5000,  # 叶子节点数
             'tree_learner': 'serial',
-            'min_data_in_leaf': 10,
+            'min_data_in_leaf': 100,
             'metric': ['l1', 'l2', 'rmse'],  # l1:mae, l2:mse  # 评估函数
             'max_bin': 255,
-            'num_trees':300,
+            'num_trees':1000,
             'max_depth':30,
-            'num_threads':8,
+            'num_threads':18,
             'is_unbalance':'true'
             #'verbose':1
 
@@ -337,12 +339,12 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
         lgb_eval = lgb.Dataset(testInputs, testTargets, reference=lgb_train)
         gbm = lgb.train(params,
                         lgb_train,
-                        num_boost_round=500,
+                        num_boost_round=1000,
                         valid_sets=lgb_eval,
                         init_model=gbm,  # 如果gbm不为None，那么就是在上次的基础上接着训练
                         # feature_name=x_cols,
-                        early_stopping_rounds=100,
-                        verbose_eval=False,
+                        early_stopping_rounds=10,
+                        verbose_eval=True,
                         keep_training_booster=True)
         # 输出模型评估分数
         score_train = dict([(s[1], s[2]) for s in gbm.eval_train()])
@@ -355,21 +357,23 @@ def mytrain2(stocks,startDate,endDate,predictDate,BATCH_SIZE):
         gbm.save_model(model_save_path)
         del prepared_data,inputs,targets
         current_loop+=1
-        break
-    return gbm
-days=getTradedays(20180101,20191025)
-trainNum=100
-stocks=getCodes(500)
-stocks=['600000.SH']
+        if current_loop>=1:
 
-for i in range(trainNum,len(days)-1,1):
+            break
+    return gbm
+days=getTradedays(20170101,20191025)
+trainNum=244
+stocks=getCodes(500)
+#stocks=['600000.SH']
+
+for i in range(trainNum,len(days)-1,100):
     trainStart=days[i-trainNum]
     trainEnd=days[i-1]
     today=days[i]
     mygbm=mytrain2(stocks,trainStart,trainEnd,today,BATCH_SIZE)
     test_list = getDataList(stocks, today, today)
     load_index_list = np.random.permutation(len(test_list))
-    batch_idx = load_index_list[0:min(BATCH_SIZE,len(test_list))]
+    batch_idx = load_index_list[0:min(VALIDATION_SIZE,len(test_list))]
     prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data)(o['code'], o['date'], database,All_COLUMNS) for o in [test_list[z] for z in batch_idx])
     #prepared_data = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(get_tick_data_fromh5)(o['code'], o['date'], All_COLUMNS) for o in [test_list[z] for z in batch_idx])
     testInputs, testTargets = getDataAssumble(prepared_data)
@@ -378,6 +382,7 @@ for i in range(trainNum,len(days)-1,1):
     corr=np.round(np.corrcoef(testTargets,predict)[0][1],4)
     print(f'today: {today} code: {stocks} ')
     print('当前模型在训练集的R2是：R2=%.4f  corr是：corr=%.4f' % (r2,corr))
+    del prepared_data
     print("==============================================================")
 pass
 

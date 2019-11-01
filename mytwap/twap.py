@@ -20,19 +20,20 @@ import lightgbm as lgb
 
 
 # GLOBAL PART
-database='MaoTickFactors20190831'
-INFLUXDBHOST='192.168.58.71'
-LOCALDATAPATH=r'd:/BTP/LocalDataBase'
-LOCALFeatureDATAPATH=r'd:/Data'
-#LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
-#database='MaoTickFactors20191027'
-#INFLUXDBHOST='192.168.38.2'
+# database='MaoTickFactors20190831'
+# INFLUXDBHOST='192.168.58.71'
+# LOCALDATAPATH=r'd:/BTP/LocalDataBase'
+# LOCALFeatureDATAPATH=r'd:/Data'
+LOCALDATAPATH=r'/home/public/mao/BTP/LocalDataBase'
+database='MaoTickFactors20191027'
+INFLUXDBHOST='192.168.38.2'
+LOCALFeatureDATAPATH=r'/home/maoheng/Data'
 file=os.path.join(LOCALDATAPATH,'normalization20190712.h5')
 with pd.HDFStore(file,'r',complib='blosc:zstd',append=True,complevel=9) as store:
     mynormalization=store['data']
 FEATURE_COLUMNS =list(mynormalization['name'])
-TARGET_COLUMNS = ['midIncreaseNext1m','buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
-#TARGET_COLUMNS = ['midIncreaseNext1m']
+#TARGET_COLUMNS = ['midIncreaseNext1m','buyPriceIncreaseNext15s','sellPriceIncreaseNext15s']
+TARGET_COLUMNS = ['midIncreaseNext1m']
 USEFUL_COLUMNS=FEATURE_COLUMNS+['realData']
 All_COLUMNS=USEFUL_COLUMNS+TARGET_COLUMNS
 
@@ -138,7 +139,7 @@ def get_tick_data_fromh5(code,date,columns=All_COLUMNS):
         if tick_data.shape[0]==0:
             #print(f'data of {code} in {date} from {database} has error!!!')
             return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1)),[]
-        ##鏍囧噯鍖?        tick_data=dataNormalization(tick_data,mynormalization)
+        tick_data=dataNormalization(tick_data,mynormalization)
         # replace inf to na
         tick_data = tick_data.replace(np.inf, np.nan)
         tick_data = tick_data.replace(-np.inf, np.nan)
@@ -164,7 +165,7 @@ def get_tick_data(code,date,database,columns=All_COLUMNS):
         if tick_data.shape[0]==0:
             #print(f'data of {code} in {date} from {database} has error!!!')
             return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1)),[]
-        ##鏍囧噯鍖?        tick_data=dataNormalization(tick_data,mynormalization)
+        tick_data=dataNormalization(tick_data,mynormalization)
         # replace inf to na
         tick_data = tick_data.replace(np.inf, np.nan)
         tick_data = tick_data.replace(-np.inf, np.nan)
@@ -196,6 +197,7 @@ def modifyData(batch_X, batch_y, batch_flag):
     for i in range(batch_seq_X.shape[0]):
         batch_seq_X[i,:]=batch_X[i:i+SEQ_LENGTH,:].copy().flatten()
         if ((np.isnan(batch_seq_X[i,:]).any()==True) | (np.isnan(batch_seq_y[i]).any()==True)| (batch_seq_flag[i]==0)):
+            print(f'num:{i}, {batch_seq_flag[i]}')
             na_idx[i]=1
     #batch_seq_X = batch_seq_X[na_idx == 0]
     #batch_seq_y = batch_seq_y[na_idx == 0]
@@ -248,7 +250,7 @@ def statistics(code,date,model):
     mybuy=np.round(mybuy/num,8)
     mysell=np.round(mysell/num,8)
     mid=(buy+sell)/2
-    print(code,date,np.round(r2_score(target[batch_flag == 0],predict[batch_flag == 0]),4),np.round(np.corrcoef(target[batch_flag == 0],predict[batch_flag == 0])[0][1],4))
+    print(code,date,np.round(r2_score(target[flag == 0],predict[flag == 0]),4),np.round(np.corrcoef(target[flag == 0],predict[flag == 0])[0][1],4))
     #print(buy,sell,mid,mybuy,mybuy)
     buyimprove=np.round((buy-mybuy)/buy,4)
     sellimprove=np.round((mysell-sell)/sell,4)
@@ -257,18 +259,27 @@ def statistics(code,date,model):
     print(buyimprove,sellimprove,buymidimprove,sellmidimprove)
     print("==============================================================================")
     pass
-#statistics('000021.SZ',20180111,gbm)
-stocks=getCodes(500)
+
+
+
+#stocks=getCodes(500)
 stocks=['600000.SH']
-test_list=getDataList(stocks,20180403,20180403)
-model_save_path=os.path.join(LOCALDATAPATH,'lightgbmModel','20180403.txt')
+days=getTradedays(20180103,20191025)
+mystart=20190101
+myend=20190830
+
+stockList=getDataList(stocks,mystart,myend)
+fileName='dart05020180102.txt'
+model_save_path = os.path.join(LOCALDATAPATH, 'lightgbmModel', fileName)
 gbm = lgb.Booster(model_file=model_save_path)
-for item in test_list:
-    code=item['code']
-    date=item['date']
-    statistics(code,date,gbm)
-    #print(code,date)
-    #break
+
+
+for date in days:
+    for code in stocks:
+        model_save_path = os.path.join(LOCALDATAPATH, 'lightgbmModel', str(date)+'.txt')
+        gbm = lgb.Booster(model_file=model_save_path)
+        statistics(code, date, gbm)
+        pass
     pass
 
 

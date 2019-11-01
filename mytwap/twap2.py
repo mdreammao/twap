@@ -140,7 +140,7 @@ def get_tick_data_fromh5(code,date,columns=All_COLUMNS):
         if tick_data.shape[0]==0:
             #print(f'data of {code} in {date} from {database} has error!!!')
             return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1)),[]
-        ##鏍囧噯鍖?        tick_data=dataNormalization(tick_data,mynormalization)
+        tick_data=dataNormalization(tick_data,mynormalization)
         # replace inf to na
         tick_data = tick_data.replace(np.inf, np.nan)
         tick_data = tick_data.replace(-np.inf, np.nan)
@@ -166,7 +166,7 @@ def get_tick_data(code,date,database,columns=All_COLUMNS):
         if tick_data.shape[0]==0:
             #print(f'data of {code} in {date} from {database} has error!!!')
             return np.zeros((0, len(FEATURE_COLUMNS))), np.zeros((0, len(TARGET_COLUMNS))), np.zeros((0, 1)),[]
-        ##鏍囧噯鍖?        tick_data=dataNormalization(tick_data,mynormalization)
+        tick_data=dataNormalization(tick_data,mynormalization)
         # replace inf to na
         tick_data = tick_data.replace(np.inf, np.nan)
         tick_data = tick_data.replace(-np.inf, np.nan)
