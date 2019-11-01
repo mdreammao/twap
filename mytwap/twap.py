@@ -366,10 +366,10 @@ def mystrategy(code, date, model_save_path,savepath):
         buyPriceNow=tick[i][1]
         sellPriceNow=tick[i][0]
         # 如果要跌，等等再买
-        if (tick[i][2] < -0.02) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
+        if (tick[i][2] < -0.005) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
             allreadybuy=False
             for j in range(step):
-                if (tick[i+j][1]<buyPriceNow*0.999):
+                if (tick[i+j][1]<buyPriceNow*0.998):
                     mybuy += tick[i + j][1]
                     allreadybuy=True
                     break
@@ -378,10 +378,10 @@ def mystrategy(code, date, model_save_path,savepath):
         else:
             mybuy += tick[i][1]
         # 如果要涨，等等再卖
-        if (tick[i][2] > 0.02) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
+        if (tick[i][2] > 0.005) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
             allreadysell=False
             for j in range(step):
-                if (tick[i+j][0]>sellPriceNow*0.999):
+                if (tick[i+j][0]>sellPriceNow*1.002):
                     mysell += tick[i + j][0]
                     allreadysell=True
                     break
