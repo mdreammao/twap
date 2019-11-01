@@ -362,14 +362,31 @@ def mystrategy(code, date, model_save_path,savepath):
         buy += tick[i][1]
         sell += tick[i][0]
         num = num + 1
+
+        buyPriceNow=tick[i][1]
+        sellPriceNow=tick[i][0]
         # 如果要跌，等等再买
-        if (tick[i][2] < -0.015) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
-            mybuy += tick[i + step][1]
+        if (tick[i][2] < -0.02) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
+            allreadybuy=False
+            for j in range(step):
+                if (tick[i+j][1]<buyPriceNow*0.999):
+                    mybuy += tick[i + j][1]
+                    allreadybuy=True
+                    break
+            if allreadybuy==False:
+                mybuy += tick[i + step][1]
         else:
             mybuy += tick[i][1]
         # 如果要涨，等等再卖
-        if (tick[i][2] > 0.015) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
-            mysell += tick[i + step][0]
+        if (tick[i][2] > 0.02) & (tick[i][3] < 1) & (i < (tick.shape[0] - 2 * step)):
+            allreadysell=False
+            for j in range(step):
+                if (tick[i+j][0]>sellPriceNow*0.999):
+                    mysell += tick[i + j][0]
+                    allreadysell=True
+                    break
+            if allreadysell==False:
+                mysell += tick[i + step][0]
         else:
             mysell += tick[i][0]
     buy = np.round(buy / num, 8)
