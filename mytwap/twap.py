@@ -145,12 +145,23 @@ def getDataFromH5(code,date,columns):
     else:
         return pd.DataFrame()
 
-
-def savePredictDataToH5(code,date,data):
+def getPredictDataFromH5(code,date,savepath):
     code=str(code)
     date=str(date)
-    file=os.path.join(LOCALFeatureDATAPATH,'predict',date,code+".h5")
-    pathCreate(os.path.join(LOCALFeatureDATAPATH,'predict',date))
+    file=os.path.join(LOCALFeatureDATAPATH,'predict',savepath,date,code+".h5")
+    if (os.path.isfile(file)==True):
+        with pd.HDFStore(file,'r',complib='blosc:zstd',append=False,complevel=9) as store:
+            data=store['data']
+        return data
+    else:
+        return pd.DataFrame()
+    pass
+
+def savePredictDataToH5(code,date,savepath,data):
+    code=str(code)
+    date=str(date)
+    file=os.path.join(LOCALFeatureDATAPATH,'predict',savepath,date,code+".h5")
+    pathCreate(os.path.join(LOCALFeatureDATAPATH,'predict',savepath,date))
     if data.shape[0]>3000:
         with pd.HDFStore(file,'a',complib='blosc:zstd',append=False,complevel=9) as store:
             store.append('data',data,append=False,format="table",data_columns=data.columns)
@@ -290,7 +301,7 @@ def modifyData(batch_X, batch_y, batch_flag):
 #    print("==============================================================================")
 #    pass
 
-def myPredictSave(code,date,model_save_path):
+def myPredictSave(code,date,model_save_path,savepath):
     batch_X, batch_y, batch_flag, mytime = get_tick_data(code, date, database, All_COLUMNS)
     if (batch_X.shape[0] < 1000):
         return
@@ -305,34 +316,42 @@ def myPredictSave(code,date,model_save_path):
     # tickData=getDataFromH5(code,date,['B1','S1'])
     tickData = getData(code, date, ['B1', 'S1'])
     tickData[['predict', 'target', 'flag']] = predictDf[['predict', 'target', 'flag']]
-    mysasavePredictDataToH5(code,date,tickData)
+    tickData['code']=code
+    tickData['date']=date
+    savePredictDataToH5(code,date,savepath,tickData)
     print(f'predict of {code} in date {date} finished!!')
     pass
 
 
-def myPredictSaveByCode(code,startDate,endDate,model_save_path):
+def myPredictSaveByCode(code,startDate,endDate,model_save_path,savepath):
     days=getTradedays(startDate,endDate)
     gbm = lgb.Booster(model_file=model_save_path)
     for date in days:
-        myPredictSave(code,date,gbm)
+        myPredictSave(code,date,gbm,savepath)
 
-def mystrategy(code, date, model_save_path):
-    # batch_X, batch_y, batch_flag,mytime=get_tick_data_fromh5(code,date,All_COLUMNS)
-    batch_X, batch_y, batch_flag, mytime = get_tick_data(code, date, database, All_COLUMNS)
-    if (batch_X.shape[0] < 1000):
-        return
-    #model = lgb.Booster(model_file=model_save_path)
-    model=model_save_path
-    input, target, flag = modifyData(batch_X, batch_y, batch_flag)
-    predict = model.predict(input)
-    predictDf = pd.DataFrame(index=mytime)
-    predictDf['predict'] = predict
-    predictDf['target'] = target
-    predictDf['flag'] = flag
-    # tickData=getDataFromH5(code,date,['B1','S1'])
-    tickData = getData(code, date, ['B1', 'S1'])
-    tickData[['predict', 'target', 'flag']] = predictDf[['predict', 'target', 'flag']]
+def mystrategy(code, date, model_save_path,savepath):
+    #batch_X, batch_y, batch_flag, mytime = get_tick_data(code, date, database, All_COLUMNS)
+    #if (batch_X.shape[0] < 1000):
+    #    return
+    ##model = lgb.Booster(model_file=model_save_path)
+    #model=model_save_path
+    #input, target, flag = modifyData(batch_X, batch_y, batch_flag)
+    #predict = model.predict(input)
+    #predictDf = pd.DataFrame(index=mytime)
+    #predictDf['predict'] = predict
+    #predictDf['target'] = target
+    #predictDf['flag'] = flag
+    ## tickData=getDataFromH5(code,date,['B1','S1'])
+    #tickData = getData(code, date, ['B1', 'S1'])
+    #tickData[['predict', 'target', 'flag']] = predictDf[['predict', 'target', 'flag']]
+    
+    tickData=getPredictDataFromH5(code,date,savepath)
+    if (tickData.shape[0]<=0):
+        return pd.DataFrame()
     tick = tickData.values
+    target=tick[:,3]
+    predict=tick[:,2]
+    flag=tick[:,4]
     buy = 0
     sell = 0
     mybuy = 0
@@ -359,7 +378,7 @@ def mystrategy(code, date, model_save_path):
     mysell = np.round(mysell / num, 8)
     mid = (buy + sell) / 2
     r2 = np.round(r2_score(target[flag == 0], predict[flag == 0]), 4)
-    mycorr = np.round(np.corrcoef(target[flag == 0], predict[flag == 0])[0][1], 4)
+    mycorr = np.round(np.corrcoef(list(target[flag == 0]), list(predict[flag == 0]))[0][1], 4)
     # print(code, date, np.round(r2_score(target[flag == 0], predict[flag == 0]), 4),np.round(np.corrcoef(target[flag == 0], predict[flag == 0])[0][1], 4))
     # print(buy,sell,mid,mybuy,mybuy)
     buyimprove = np.round((buy - mybuy) / buy, 4)
@@ -374,27 +393,27 @@ def mystrategy(code, date, model_save_path):
 
     return result
 
-def mystrategyByCode(code,startDate,endDate,model_save_path):
+def mystrategyByCode(code,startDate,endDate,model_save_path,savepath):
     days=getTradedays(startDate,endDate)
     gbm = lgb.Booster(model_file=model_save_path)
     resultList=[]
     for date in days:
-        result=mystrategy(code,date,gbm)
+        result=mystrategy(code,date,gbm,savepath)
         resultList.append(result)
     resultList=pd.concat(resultList)
     return resultList
     pass
 
 
-def myPredictSaveAll(stocks, mystart, myend, modelpath):
-    Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(myPredictSaveByCode)(code, mystart,myend, modelpath) for code in stocks)
+def myPredictSaveAll(stocks, mystart, myend, modelpath,savepath):
+    Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(myPredictSaveByCode)(code, mystart,myend, modelpath,savepath) for code in stocks)
     pass
 
-def mybacktest(stocks, mystart, myend, modelpath):
+def mybacktest(stocks, mystart, myend, modelpath,savepath):
     #backtestList = getDataList(stocks, mystart, myend)
     #result = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(mystrategy)(o['code'], o['date'], model) for o in backtestList)
     
-    result = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(mystrategyByCode)(code, mystart,myend, modelpath) for code in stocks)
+    result = Parallel(n_jobs=PREPARE_JOBS, verbose=0)(delayed(mystrategyByCode)(code, mystart,myend, modelpath,savepath) for code in stocks)
     
     
     result = pd.concat(result)
@@ -405,16 +424,16 @@ stocks=getCodes(300)
 #stocks=['600000.SH']
 days=getTradedays(20180103,20191025)
 mystart=20190201
-myend=20190630
+myend=20190228
 fileName='dart05020180102.txt'
+savepath='dart05020180102'
 model_save_path = os.path.join(LOCALDATAPATH, 'lightgbmModel', fileName)
 PREPARE_JOBS=-1
 gbm = lgb.Booster(model_file=model_save_path)
 
 
 t0=time.time()
-#data=mybacktest(stocks,mystart,myend,model_save_path)
-data=myPredictSaveAll(stocks,mystart,myend,model_save_path)
+#myPredictSaveAll(stocks,mystart,myend,model_save_path,savepath)
 t1=time.time()
 print(t1-t0)
 
@@ -423,7 +442,7 @@ print(t1-t0)
 
 t0=time.time()
 #data=mybacktest(stocks,mystart,myend,model_save_path)
-data=mybacktest(stocks,mystart,myend,model_save_path)
+data=mybacktest(stocks,mystart,myend,model_save_path,savepath)
 t1=time.time()
 print(t1-t0)
 
